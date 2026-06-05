@@ -91,6 +91,12 @@ const routes = [
     name: 'Settings',
     component: () => import('../views/settings/SettingsView.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings/wa',
+    name: 'WaSettings',
+    component: () => import('../views/settings/WaSettings.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 

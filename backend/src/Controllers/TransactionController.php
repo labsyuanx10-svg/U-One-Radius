@@ -14,6 +14,7 @@ class TransactionController
             ->select('transactions.*')
             ->select('users.fullname', 'user_name')
             ->select('users.uid', 'user_uid')
+            ->select('users.phone', 'user_phone')
             ->join('users', ['transactions.user_id', '=', 'users.id']);
 
         if (!in_array($user->role, ['superadmin'])) {
@@ -146,6 +147,104 @@ class TransactionController
         }
         $trx->delete();
         return jsonResponse($response, ['message' => 'Transaction deleted']);
+    }
+
+    public function sendWa(Request $request, Response $response, $args)
+    {
+        $trx = \ORM::for_table('transactions')
+            ->select('transactions.*')
+            ->select('users.fullname', 'user_name')
+            ->select('users.uid', 'user_uid')
+            ->select('users.phone', 'user_phone')
+            ->join('users', ['transactions.user_id', '=', 'users.id'])
+            ->find_one($args['id']);
+
+        if (!$trx) {
+            return jsonResponse($response, ['error' => 'Transaction not found'], 404);
+        }
+
+        $phone = $trx->user_phone;
+        if (!$phone) {
+            return jsonResponse($response, ['error' => 'Nomor HP pelanggan tidak tersedia'], 400);
+        }
+
+        // Get WA gateway settings
+        $waUrl = $this->getSetting('wa_api_url', '');
+        $waKey = $this->getSetting('wa_api_key', '');
+        $waSession = $this->getSetting('wa_session', 'default');
+
+        if (empty($waUrl) || empty($waKey)) {
+            return jsonResponse($response, ['error' => 'Konfigurasi WhatsApp Gateway belum diatur. Isi di menu Settings.'], 400);
+        }
+
+        // Format phone
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+        if (substr($cleanPhone, 0, 1) === '0') {
+            $cleanPhone = '62' . substr($cleanPhone, 1);
+        } elseif (substr($cleanPhone, 0, 2) !== '62') {
+            $cleanPhone = '62' . $cleanPhone;
+        }
+
+        $appName = $this->getSetting('app_name', 'U-One Radius');
+        $currency = $this->getSetting('currency', 'IDR');
+        $amount = number_format((int)$trx->amount, 0, ',', '.');
+
+        $message = "*{$appName}*\n\n";
+        $message .= "Halo *{$trx->user_name}*, tagihan internet Anda:\n";
+        $message .= "━━━━━━━━━━━━━━━━\n";
+        $message .= "Invoice: {$trx->invoice_no}\n";
+        $message .= "Jumlah: Rp {$amount}\n";
+        $message .= "Jatuh Tempo: " . date('d/m/Y', strtotime($trx->due_date)) . "\n";
+        $message .= "━━━━━━━━━━━━━━━━\n\n";
+        $message .= "Segera lakukan pembayaran sebelum jatuh tempo.\n";
+        $message .= "Terima kasih.";
+
+        // Send to OpenWA
+        $payload = json_encode([
+            'session' => $waSession,
+            'to' => $cleanPhone,
+            'text' => $message
+        ]);
+
+        $apiUrl = rtrim($waUrl, '/') . '/api/sendText';
+
+        $ch = curl_init($apiUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'X-API-Key: ' . $waKey
+            ],
+            CURLOPT_TIMEOUT => 15
+        ]);
+
+        $result = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            return jsonResponse($response, ['error' => 'Gagal terhubung ke WA Gateway: ' . $error], 500);
+        }
+
+        if ($httpCode >= 200 && $httpCode < 300) {
+            // Log aktivitas
+            $user = $request->getAttribute('user');
+            $log = \ORM::for_table('logs')->create();
+            $log->user_id = $user->id;
+            $log->action = 'send_wa_reminder';
+            $log->description = "Kirim WA reminder invoice {$trx->invoice_no} ke {$trx->user_name}";
+            $log->ip_address = \ORM::raw('?', [$_SERVER['REMOTE_ADDR'] ?? '']);
+            $log->save();
+
+            return jsonResponse($response, ['message' => 'Pesan WA berhasil dikirim']);
+        }
+
+        $resp = json_decode($result, true);
+        $errMsg = $resp['message'] ?? $resp['error'] ?? 'HTTP ' . $httpCode;
+        return jsonResponse($response, ['error' => 'WA Gateway error: ' . $errMsg], 500);
     }
 
     public function pdf(Request $request, Response $response, $args)

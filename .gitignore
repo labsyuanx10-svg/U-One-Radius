@@ -4,3 +4,7 @@ backend/.env.example
 node_modules/
 vendor/
 dist/
+
+# OpenWA submodule — managed separately
+openwa/
+!openwa/.gitkeep

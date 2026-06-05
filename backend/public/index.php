@@ -140,6 +140,7 @@ $app->group('/api/transactions', function ($group) use ($authMiddleware) {
     $group->put('/{id}', 'App\Controllers\TransactionController:update');
     $group->delete('/{id}', 'App\Controllers\TransactionController:delete');
     $group->get('/{id}/pdf', 'App\Controllers\TransactionController:pdf');
+    $group->post('/{id}/send-wa', 'App\Controllers\TransactionController:sendWa');
 })->add($authMiddleware);
 
 // ── Tickets ──
@@ -150,6 +151,9 @@ $app->group('/api/tickets', function ($group) use ($authMiddleware) {
     $group->put('/{id}', 'App\Controllers\TicketController:update');
     $group->delete('/{id}', 'App\Controllers\TicketController:delete');
 })->add($authMiddleware);
+
+// ── WhatsApp Gateway ──
+$app->post('/api/wa/test', 'App\Controllers\WaController:test')->add($authMiddleware);
 
 // ── RADIUS Accounting ──
 $app->group('/api/radacct', function ($group) use ($authMiddleware) {

@@ -54,6 +54,7 @@
             <template #body="{ data }">
               <div class="flex gap-2">
                 <Button v-if="data.status !== 'paid'" label="Lunas" severity="success" size="small" @click="confirmPay(data)" />
+                <Button :label="sendingMap[data.id] ? 'Mengirim...' : 'Kirim WA'" :disabled="sendingMap[data.id]" severity="info" size="small" @click="sendWaReminder(data)" />
                 <Button label="Cetak" severity="secondary" size="small" @click="printInvoice(data)" />
               </div>
             </template>
@@ -115,6 +116,7 @@ const perPage = ref(20)
 const payModal = ref(false)
 const paying = ref(false)
 const payTarget = ref(null)
+const sendingMap = ref({})
 
 const statusFilterOptions = [
   { label: 'Semua Status', value: null },
@@ -173,6 +175,20 @@ function confirmPay(tx) {
       }
     }
   })
+}
+
+async function sendWaReminder(tx) {
+  if (sendingMap.value[tx.id]) return
+  sendingMap.value = { ...sendingMap.value, [tx.id]: true }
+  try {
+    await api.post(`/transactions/${tx.id}/send-wa`)
+    toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Pesan WA terkirim', life: 3000 })
+  } catch (e) {
+    const err = e.response?.data?.error || 'Gagal kirim WA'
+    toast.add({ severity: 'error', summary: 'Gagal', detail: err, life: 5000 })
+  } finally {
+    sendingMap.value = { ...sendingMap.value, [tx.id]: false }
+  }
 }
 
 function printInvoice(tx) {

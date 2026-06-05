@@ -22,13 +22,14 @@
 
     <!-- Navigation -->
     <nav class="flex-1 overflow-y-auto py-4 px-2 space-y-1">
+      <!-- Normal router links -->
       <router-link
         v-for="item in navItems"
         :key="item.path"
         :to="item.path"
         :class="[
           'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-          isActive(item.path)
+          isActive(item.path, item.exact, item.prefix)
             ? 'bg-primary-600 text-white'
             : 'text-gray-300 hover:bg-sidebar-hover hover:text-white'
         ]"
@@ -36,6 +37,8 @@
         <span class="text-lg flex-shrink-0">{{ item.icon }}</span>
         <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
       </router-link>
+
+
     </nav>
 
     <!-- User Info & Logout -->
@@ -72,21 +75,23 @@ const appStore = useAppStore()
 const collapsed = computed(() => appStore.sidebarCollapsed)
 
 const navItems = [
-  { path: '/', icon: '📊', label: 'Dashboard' },
-  { path: '/customers', icon: '👥', label: 'Pelanggan' },
-  { path: '/plans', icon: '📦', label: 'Paket & Pool' },
-  { path: '/routers', icon: '🖥️', label: 'Router' },
-  { path: '/groups', icon: '🏢', label: 'Group' },
-  { path: '/tickets', icon: '🎫', label: 'Tiket' },
-  { path: '/radacct', icon: '📡', label: 'Status Online' },
-  { path: '/radacct/logradius', icon: '📋', label: 'Log Radius' },
-  { path: '/transactions', icon: '💰', label: 'Tagihan' },
-  { path: '/settings', icon: '⚙️', label: 'Pengaturan' }
+  { path: '/', icon: '📊', label: 'Dashboard', exact: true },
+  { path: '/customers', icon: '👥', label: 'Pelanggan', prefix: '/customers' },
+  { path: '/plans', icon: '📦', label: 'Paket & Pool', exact: true },
+  { path: '/routers', icon: '🖥️', label: 'Router', exact: true },
+  { path: '/groups', icon: '🏢', label: 'Group', exact: true },
+  { path: '/tickets', icon: '🎫', label: 'Tiket', exact: true },
+  { path: '/radacct', icon: '📡', label: 'Status Online', exact: true },
+  { path: '/radacct/logradius', icon: '📋', label: 'Log Radius', exact: true },
+  { path: '/transactions', icon: '💰', label: 'Tagihan', exact: true },
+  { path: '/settings', icon: '⚙️', label: 'Pengaturan', exact: true },
+  { path: '/settings/wa', icon: '📲', label: 'WA Setting', exact: true }
 ]
 
-function isActive(path) {
-  if (path === '/') return route.path === '/'
-  return route.path.startsWith(path)
+function isActive(path, exact, prefix) {
+  if (exact) return route.path === path
+  if (prefix) return route.path.startsWith(prefix)
+  return route.path === path
 }
 
 function handleLogout() {
