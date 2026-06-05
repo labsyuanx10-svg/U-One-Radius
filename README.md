@@ -4,7 +4,7 @@ Billing ISP Management System — PHP + Vue 3 + Docker + FreeRADIUS
 
 **Tech:** PHP 8.4 (Slim Framework) · Vue 3 · PrimeVue 4 · MariaDB 11 · FreeRADIUS · Docker
 
-Status: **v0.1.0-dev** (masih pengembangan)
+Status: **v0.2.0-dev** (masih pengembangan)
 
 ## Fitur
 
@@ -14,6 +14,7 @@ Status: **v0.1.0-dev** (masih pengembangan)
 - 💰 Tagihan dan invoice
 - 📡 Status online user RADIUS
 - 📋 Log radius (connect/disconnect)
+- 📲 Kirim invoice via WhatsApp (OpenWA gateway)
 - ⛔ Auto isolir pelanggan expired
 - 🔑 Multi-level admin (superadmin, admin)
 - 🗺️ Peta lokasi pelanggan (Leaflet)
@@ -33,6 +34,13 @@ Status: **v0.1.0-dev** (masih pengembangan)
                     │   FreeRADIUS    │  │  radcheck    │
                     │  (1812-1813/udp)│  │  radacct     │
                     └─────────────────┘  └──────────────┘
+                                                    
+┌─────────────────┐
+│   OpenWA        │
+│  (WA Gateway)   │
+│  port 3000 API  │
+│  port 3001 UI   │
+└─────────────────┘
 ```
 
 ## Cara Jalanin

@@ -418,6 +418,8 @@ server {
 | `backend` | custom (php:8.4-apache) | 8090:80 | db (healthy) | - |
 | `frontend` | custom (nginx) | 8091:80 | - | - |
 | `freeradius` | freeradius/freeradius-server | 1812-1813/udp | db (healthy) | - |
+| `openwa-api` | custom (node:22 + puppeteer) | 3000:2785 | - | `./openwa/data:/app/data` |
+| `openwa-dashboard` | custom (nginx:alpine) | 3001:80 | openwa-api | - |
 
 Environment variables utama:
 - `MYSQL_DATABASE=bill_isp`, `MYSQL_USER=billing`, `MYSQL_PASSWORD=billing123`
@@ -489,6 +491,8 @@ docker compose down -v
 | 3306 | MariaDB | MySQL |
 | 1812 | RADIUS Auth | UDP |
 | 1813 | RADIUS Accounting | UDP |
+| 3000 | OpenWA API | HTTP |
+| 3001 | OpenWA Dashboard | HTTP |
 
 ---
 
@@ -500,3 +504,237 @@ docker compose down -v
 - **Freeradius** restart loop sementara masih ada, tapi auth jalan
 - **Auto-generate username/password** untuk customer udah dihapus — pake UID aja
 - **Username PPPoE + Password PPPoE** wajib diisi kalo pilih paket
+
+---
+
+## 📲 WhatsApp Gateway (OpenWA)
+
+### Container Architecture
+
+```
+┌────────────────────────┐      HTTP /api/sendText
+│   Billing Backend       │─────────────────────────┐
+│   (PHP, port 8090)      │                         │
+│                         │   POST /api/wa/test     │
+│  TransactionController  │   POST /transactions/   │
+│  → sendWa()            │       {id}/send-wa      │
+└────────────────────────┘                         │
+                                                   ▼
+┌──────────────────────────────────────────────────────┐
+│                    OpenWA                             │
+│  ┌─────────────────────┐  ┌────────────────────────┐ │
+│  │  API (Node.js)      │  │  Dashboard (nginx)     │ │
+│  │  port 3000          │  │  port 3001             │ │
+│  │  NestJS + Puppeteer │  │  React SPA             │ │
+│  └─────────┬───────────┘  │  → proxy /api ->       │ │
+│            │              │    openwa:2785         │ │
+│            ▼              └────────────────────────┘ │
+│  ┌──────────────────┐                                 │
+│  │  Chromium        │  ┌────────────────────┐        │
+│  │  (WhatsApp Web)  │  │  data/ (.api-key,  │        │
+│  │  headless mode   │  │  sessions, db)     │        │
+│  └──────────────────┘  └────────────────────┘        │
+└──────────────────────────────────────────────────────┘
+```
+
+### Cara Deploy OpenWA
+
+OpenWA berjalan di container terpisah, join network `bill-net` yang sama.
+
+**1. Clone & setup**
+
+```bash
+cd ~/billing
+mkdir -p openwa/data openwa/dashboard
+# OpenWA source ada di direktori openwa/
+# (clone dari https://github.com/Calanca/OpenWA-Dev)
+```
+
+**2. Build & start**
+
+```bash
+cd ~/billing/openwa
+docker compose -f docker-compose-custom.yml build
+docker compose -f docker-compose-custom.yml up -d
+```
+
+**3. Cek status**
+
+```bash
+docker ps --filter name=openwa
+curl http://10.10.33.52:3000/api/health
+# → {"status":"ok",...}
+```
+
+### Setup di Billing
+
+**1. Dapatkan API Key**
+
+```bash
+docker exec openwa cat /app/data/.api-key
+# → owa_k1_<random_hex>
+```
+
+**2. Buka Settings > WA Setting di billing UI**
+
+| Field | Value |
+|-------|-------|
+| API URL | `http://10.10.33.52:3000` |
+| API Key | `owa_k1_...` (dari langkah 1) |
+| Session | `default` |
+
+**3. Scan QR**
+
+1. Buka `http://10.10.33.52:3001` di browser
+2. Login pake API key di atas
+3. Klik **Start New Session** → scan QR pake HP
+4. Status jadi Connected
+
+**4. Test kirim**
+
+- Di **WA Setting**, isi no HP + pesan, klik **Test Kirim**
+- Atau dari halaman **Tagihan** → klik tombol WA per baris
+
+### Format Invoice WA
+
+```
+*INVOICE - U-One Radius*
+
+Halo {nama},
+
+Tagihan periode ini:
+No Invoice : INV-{bulan}/{tahun}/{id}
+Paket      : {nama paket}
+Total      : Rp {jumlah}
+Status     : BELUM DIBAYAR
+Jatuh Tempo: {tanggal}
+
+Bayar via:
+💰 Transfer Bank
+🏧 QRIS
+
+Terima kasih,
+Tim U-One Radius
+```
+
+### Error Handling
+
+- `Konfigurasi WA Gateway belum diatur` → isi API URL & Key di Settings
+- `Invalid API key` → pastikan API key sesuai (`docker exec openwa cat /app/data/.api-key`)
+- `Cannot find session` → session belum di-start, scan QR dulu
+- `Not connected` → WA belum terhubung, buka dashboard dan scan QR
+
+### Phone Number Format
+
+Input `08xxx` → otomatis jadi `628xxx` sebelum dikirim ke WA gateway.
+
+---
+
+## 🛠️ Tutorial OpenWA Lengkap
+
+### 1. Clone Repo
+
+```bash
+cd ~/billing
+git clone https://github.com/Calanca/OpenWA-Dev.git openwa-source
+mv openwa-source/* openwa/
+rm -rf openwa-source
+```
+
+### 2. Konfigurasi
+
+File `openwa/.env`:
+
+```
+NODE_ENV=production
+STORAGE_TYPE=sqlite
+HOST=0.0.0.0
+PORT=2785
+CORS=true
+```
+
+Custom compose (`openwa/docker-compose-custom.yml`):
+
+```yaml
+services:
+  openwa-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: openwa
+    restart: unless-stopped
+    ports:
+      - "3000:2785"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    networks:
+      - bill-net
+
+  openwa-dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: openwa-dashboard
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - openwa-api
+    networks:
+      - bill-net
+
+networks:
+  bill-net:
+    external: true
+    name: billing_bill-net
+
+volumes:
+  openwa-data:
+```
+
+### 3. Build & Start
+
+```bash
+cd ~/billing/openwa
+docker compose -f docker-compose-custom.yml build
+docker compose -f docker-compose-custom.yml up -d
+```
+
+### 4. Dapatkan API Key
+
+```bash
+docker exec openwa cat /app/data/.api-key
+# → owa_k1_...
+```
+
+### 5. Akses Dashboard
+
+- URL: `http://<ip-server>:3001`
+- Login: paste API key".
+- Start new session, scan QR via HP WhatsApp
+
+### 6. Kirim Pesan via API
+
+```bash
+curl -X POST http://<ip-server>:3000/api/sendText \
+  -H "X-API-Key: owa_k1_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": "default",
+    "to": "628123456789",
+    "text": "Test dari OpenWA"
+  }'
+```
+
+### Troubleshooting
+
+| Masalah | Solusi |
+|---------|--------|
+| Build hang/Chrome install lama | Gunakan `--no-install-recommends` di apt-get, pake `ghcr.io/puppeteer/puppeteer` base image |
+| 404 di root (`/`) | Dashboard belum di-deploy, deploy service dashboard |
+| 401 Unauthorized | API key salah, ambil ulang dari container |
+| Session not found | Belum start session di dashboard |
+| "Not connected" | QR belum di-scan, scan dari dashboard |
+| Chrome crash | Kurang shared memory, tambah `--shm-size=1gb` |
