@@ -1,0 +1,86 @@
+services:
+  db:
+    image: mariadb:11
+    container_name: bill-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=changeme
+      - MYSQL_DATABASE=billing
+      - MYSQL_USER=billing
+      - MYSQL_PASSWORD=changeme
+    volumes:
+      - bill-db-data:/var/lib/mysql
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - bill-net
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "billing", "-pchangeme"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bill-api
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_NAME=billing
+      - DB_USER=billing
+      - DB_PASS=changeme
+      - APP_SECRET=changeme
+      - TZ=Asia/Jakarta
+    networks:
+      - bill-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bill-ui
+    restart: unless-stopped
+    ports:
+      - "8091:80"
+    depends_on:
+      - backend
+    networks:
+      - bill-net
+
+  freeradius:
+    image: freeradius/freeradius-server:latest
+    container_name: bill-radius
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - TZ=Asia/Jakarta
+    volumes:
+      - ./freeradius/startup.sh:/startup.sh
+      - ./freeradius/clients.conf:/etc/freeradius/clients.conf
+      - ./freeradius/default:/etc/freeradius/sites-enabled/default
+    command: ["/bin/bash", "/startup.sh"]
+    networks:
+      - bill-net
+
+networks:
+  bill-net:
+    driver: bridge
+
+volumes:
+  bill-db-data:
