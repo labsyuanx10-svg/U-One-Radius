@@ -50,8 +50,8 @@ export function Sidebar() {
   )
 
   const isActive = (to: string) => {
-    if (to === "/") return pathname === "/"
-    return pathname.startsWith(to)
+    // Exact match only — no startsWith to avoid double-highlight (/settings vs /settings/wa)
+    return pathname === to
   }
 
   return (
