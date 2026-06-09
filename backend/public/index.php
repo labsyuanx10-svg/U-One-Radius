@@ -60,6 +60,14 @@ $adminMiddleware = new App\Middleware\AdminMiddleware();
 $app->post('/api/auth/login', 'App\Controllers\AuthController:login');
 $app->get('/api/auth/me', 'App\Controllers\AuthController:me')->add($authMiddleware);
 
+// ── Profile & Password ──
+$app->get('/api/profile', 'App\Controllers\ProfileController:get')->add($authMiddleware);
+$app->put('/api/profile/password', 'App\Controllers\ProfileController:changePassword')->add($authMiddleware);
+
+// ── Export ──
+$app->get('/api/transactions/export', 'App\Controllers\TransactionController:export')->add($authMiddleware);
+$app->get('/api/customers/export', 'App\Controllers\UserController:export')->add($authMiddleware);
+
 // ── Dashboard ──
 $app->get('/api/dashboard/stats', 'App\Controllers\DashboardController:stats')->add($authMiddleware);
 
@@ -94,6 +102,7 @@ $app->group('/api/customers', function ($group) use ($authMiddleware) {
     $group->get('/{id}/transactions', 'App\Controllers\UserController:transactions');
     $group->get('/{id}/tickets', 'App\Controllers\UserController:tickets');
     $group->get('/{id}/subscriptions', 'App\Controllers\UserController:subscriptions');
+    $group->put('/{id}/toggle-isolir', 'App\Controllers\UserController:toggleIsolir');
 })->add($authMiddleware);
 
 // ── Plans ──

@@ -38,10 +38,23 @@ class TransactionController
         if (!empty($params['group_id'])) {
             $query = $query->where('users.group_id', $params['group_id']);
         }
+        if (!empty($params['search'])) {
+            $query = $query->where_raw(
+                '(transactions.invoice_no LIKE ? OR users.fullname LIKE ?)',
+                ["%{$params['search']}%", "%{$params['search']}%"]
+            );
+        }
 
-        $trxs = $query->order_by_desc('transactions.id')->find_many();
+        // Pagination
+        $page = max(1, (int)($params['page'] ?? 1));
+        $limit = max(1, min(100, (int)($params['limit'] ?? 20)));
+        $offset = ($page - 1) * $limit;
+
+        $total = $query->count();
+
+        $trxs = $query->order_by_desc('transactions.id')->offset($offset)->limit($limit)->find_many();
         $result = array_map(function($t) { return $t->as_array(); }, $trxs);
-        return jsonResponse($response, ['data' => $result]);
+        return jsonResponse($response, ['data' => $result, 'total' => (int)$total, 'page' => $page, 'limit' => $limit]);
     }
 
     public function get(Request $request, Response $response, $args)
@@ -148,6 +161,58 @@ class TransactionController
         }
         $trx->delete();
         return jsonResponse($response, ['message' => 'Transaction deleted']);
+    }
+
+    public function export(Request $request, Response $response, $args)
+    {
+        $user = $request->getAttribute('user');
+        $query = \ORM::for_table('transactions')
+            ->select('transactions.*')
+            ->select('users.fullname', 'user_name')
+            ->select('users.uid', 'user_uid')
+            ->select('users.phone', 'user_phone')
+            ->join('users', ['transactions.user_id', '=', 'users.id']);
+
+        if (!in_array($user->role, ['superadmin'])) {
+            $query = $query->where('users.group_id', $user->group_id);
+        }
+
+        $params = $request->getQueryParams();
+        if (!empty($params['status'])) {
+            $query = $query->where('transactions.status', $params['status']);
+        }
+        if (!empty($params['date_from'])) {
+            $query = $query->where_gte('transactions.created_at', $params['date_from'] . ' 00:00:00');
+        }
+        if (!empty($params['date_to'])) {
+            $query = $query->where_lte('transactions.created_at', $params['date_to'] . ' 23:59:59');
+        }
+        if (!empty($params['group_id'])) {
+            $query = $query->where('users.group_id', $params['group_id']);
+        }
+
+        $trxs = $query->order_by_desc('transactions.id')->find_many();
+
+        $csv = "Invoice,Pelanggan,UID,No.HP,Jumlah,Status,Metode Bayar,Tgl Bayar,Jatuh Tempo,Tgl Buat\n";
+        foreach ($trxs as $t) {
+            $status = $t->status === 'paid' ? 'Lunas' : ($t->status === 'unpaid' ? 'Belum Bayar' : $t->status);
+            $csv .= '"' . $t->invoice_no . '",'; 
+            $csv .= '"' . $t->user_name . '",';
+            $csv .= '"' . $t->user_uid . '",';
+            $csv .= '"' . $t->user_phone . '",';
+            $csv .= $t->amount . ',';
+            $csv .= '"' . $status . '",';
+            $csv .= '"' . ($t->payment_method ?: '') . '",';
+            $csv .= '"' . ($t->paid_at ? date('Y-m-d H:i', strtotime($t->paid_at)) : '') . '",';
+            $csv .= '"' . $t->due_date . '",';
+            $csv .= '"' . $t->created_at . '"\n';
+        }
+
+        $response->getBody()->write($csv);
+        return $response
+            ->withHeader('Content-Type', 'text/csv; charset=utf-8')
+            ->withHeader('Content-Disposition', 'attachment; filename="transactions_export_' . date('Ymd') . '.csv"')
+            ->withHeader('Cache-Control', 'no-cache');
     }
 
     public function sendWa(Request $request, Response $response, $args)

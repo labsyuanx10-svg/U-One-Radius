@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import api from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Save, Loader2 } from "lucide-react"
+import { ArrowLeft, Save, Loader2, MapPin } from "lucide-react"
 
 interface Option {
   id: number
@@ -42,6 +42,8 @@ export function CustomerForm() {
   const [plans, setPlans] = useState<Option[]>([])
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
+  const [geocoding, setGeocoding] = useState(false)
+  const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -78,6 +80,34 @@ export function CustomerForm() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const geocodeAddress = async (address: string) => {
+    if (!address || address.trim().length < 5) return
+    setGeocoding(true)
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=id`
+      )
+      const data = await res.json()
+      if (data && data.length > 0) {
+        const lat = parseFloat(data[0].lat).toFixed(6)
+        const lng = parseFloat(data[0].lon).toFixed(6)
+        setForm((prev) => ({ ...prev, coordinates: `${lat},${lng}` }))
+      }
+    } catch {
+      // Silently fail geocode
+    } finally {
+      setGeocoding(false)
+    }
+  }
+
+  const handleAddressBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Debounce geocode on blur
+    if (geocodeTimer.current) clearTimeout(geocodeTimer.current)
+    geocodeTimer.current = setTimeout(() => {
+      geocodeAddress(e.target.value)
+    }, 500)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -161,7 +191,16 @@ export function CustomerForm() {
               </div>
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-medium">Alamat</label>
-                <Input name="address" value={form.address} onChange={handleChange} placeholder="Alamat lengkap" />
+                <Input
+                  name="address"
+                  value={form.address}
+                  onChange={handleChange}
+                  onBlur={handleAddressBlur}
+                  placeholder="Alamat lengkap, koordinat akan otomatis terisi"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Koordinat akan otomatis terisi setelah alamat diisi
+                </p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Paket Internet</label>
@@ -177,8 +216,27 @@ export function CustomerForm() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Koordinat</label>
-                <Input name="coordinates" value={form.coordinates} onChange={handleChange} placeholder="-6.2088,106.8456" />
+                <label className="text-sm font-medium">
+                  Koordinat
+                  {geocoding && <Loader2 className="ml-2 inline h-3 w-3 animate-spin" />}
+                </label>
+                <div className="relative">
+                  <Input
+                    name="coordinates"
+                    value={form.coordinates}
+                    onChange={handleChange}
+                    placeholder="-6.2088,106.8456"
+                    className={geocoding ? "pr-8" : ""}
+                  />
+                  {geocoding && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                  {!geocoding && form.coordinates && (
+                    <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Username PPPoE</label>

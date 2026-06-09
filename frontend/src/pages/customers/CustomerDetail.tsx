@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Edit, Loader2, MapPin, Phone, Mail, Wifi, Smartphone, FileText } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { ArrowLeft, Edit, Loader2, MapPin, Phone, Mail, Wifi, Smartphone, FileText, Ban, CheckCircle } from "lucide-react"
 
 interface Customer {
   id: number; uid: string; name: string; phone: string; email: string; nik: string
@@ -31,26 +32,46 @@ export function CustomerDetail() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [loading, setLoading] = useState(true)
+  const [isolirDialogOpen, setIsoilrDialogOpen] = useState(false)
+  const [isolirLoading, setIsoilrLoading] = useState(false)
+
+  const fetchData = async () => {
+    try {
+      const [cRes, txRes, tRes, sRes] = await Promise.all([
+        api.get(`/customers/${id}`),
+        api.get(`/customers/${id}/transactions`).catch(() => ({ data: [] })),
+        api.get(`/customers/${id}/tickets`).catch(() => ({ data: [] })),
+        api.get(`/customers/${id}/subscriptions`).catch(() => ({ data: [] })),
+      ])
+      const c = cRes.data?.data || cRes.data
+      setCustomer(c)
+      setTransactions(Array.isArray(txRes.data) ? txRes.data : txRes.data?.data || [])
+      setTickets(Array.isArray(tRes.data) ? tRes.data : tRes.data?.data || [])
+      setSubscriptions(Array.isArray(sRes.data) ? sRes.data : sRes.data?.data || [])
+    } catch {}
+    setLoading(false)
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [cRes, txRes, tRes, sRes] = await Promise.all([
-          api.get(`/customers/${id}`),
-          api.get(`/customers/${id}/transactions`).catch(() => ({ data: [] })),
-          api.get(`/customers/${id}/tickets`).catch(() => ({ data: [] })),
-          api.get(`/customers/${id}/subscriptions`).catch(() => ({ data: [] })),
-        ])
-        const c = cRes.data?.data || cRes.data
-        setCustomer(c)
-        setTransactions(Array.isArray(txRes.data) ? txRes.data : txRes.data?.data || [])
-        setTickets(Array.isArray(tRes.data) ? tRes.data : tRes.data?.data || [])
-        setSubscriptions(Array.isArray(sRes.data) ? sRes.data : sRes.data?.data || [])
-      } catch {}
-      setLoading(false)
-    }
     fetchData()
   }, [id])
+
+  const handleToggleIsolir = async () => {
+    if (!customer) return
+    setIsoilrLoading(true)
+    try {
+      const res = await api.put(`/customers/${customer.id}/toggle-isolir`)
+      const updated = res.data?.data || res.data
+      setCustomer((prev) => prev ? { ...prev, status: updated.status } : prev)
+      setIsoilrDialogOpen(false)
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Gagal toggle isolir")
+    } finally {
+      setIsoilrLoading(false)
+    }
+  }
+
+  const isIsolirOrExpired = customer?.status === "isolir" || customer?.status === "expired"
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   if (!customer) return <p className="text-muted-foreground py-20 text-center">Pelanggan tidak ditemukan</p>
@@ -64,14 +85,45 @@ export function CustomerDetail() {
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold">{customer.name}</h2>
-            <Badge variant={customer.status === "active" ? "success" : "destructive"}>{customer.status}</Badge>
+            <Badge
+              variant={
+                customer.status === "active"
+                  ? "success"
+                  : customer.status === "isolir"
+                    ? "warning"
+                    : "destructive"
+              }
+            >
+              {customer.status}
+            </Badge>
             <Badge variant="outline" className="font-mono">{customer.uid}</Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-1">Terdaftar sejak {new Date(customer.created_at).toLocaleDateString("id-ID")}</p>
         </div>
-        <Link to={`/customers/${id}/edit`}>
-          <Button variant="outline"><Edit className="mr-2 h-4 w-4" />Edit</Button>
-        </Link>
+        <div className="flex gap-2">
+          {isIsolirOrExpired ? (
+            <Button
+              variant="outline"
+              className="border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+              onClick={() => setIsoilrDialogOpen(true)}
+            >
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Aktifkan
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="border-red-500 text-red-600 hover:bg-red-50"
+              onClick={() => setIsoilrDialogOpen(true)}
+            >
+              <Ban className="mr-2 h-4 w-4" />
+              Isolir
+            </Button>
+          )}
+          <Link to={`/customers/${id}/edit`}>
+            <Button variant="outline"><Edit className="mr-2 h-4 w-4" />Edit</Button>
+          </Link>
+        </div>
       </div>
 
       {/* Info Cards Bento */}
@@ -244,6 +296,35 @@ export function CustomerDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Isolir Confirmation Dialog */}
+      <Dialog open={isolirDialogOpen} onOpenChange={setIsoilrDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isIsolirOrExpired ? "Aktifkan Pelanggan" : "Isolir Pelanggan"}</DialogTitle>
+            <DialogDescription>
+              {isIsolirOrExpired
+                ? "Aktifkan kembali akses internet pelanggan ini?"
+                : "Nonaktifkan akses internet pelanggan ini (isolir). Radius entry akan dihapus."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <p><strong>Pelanggan:</strong> {customer.name} ({customer.uid})</p>
+            <p><strong>Status saat ini:</strong> {customer.status}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsoilrDialogOpen(false)}>Batal</Button>
+            <Button
+              variant={isIsolirOrExpired ? "default" : "destructive"}
+              onClick={handleToggleIsolir}
+              disabled={isolirLoading}
+            >
+              {isolirLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isIsolirOrExpired ? "Ya, Aktifkan" : "Ya, Isolir"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

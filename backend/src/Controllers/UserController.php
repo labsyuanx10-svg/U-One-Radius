@@ -67,16 +67,16 @@ class UserController
 
         // Pagination
         $total = count($result);
-        $perPage = (int)($params['per_page'] ?? $total);
-        $page = (int)($params['page'] ?? 1);
-        $offset = ($page - 1) * $perPage;
-        $paginated = array_slice($result, $offset, $perPage);
+        $page = max(1, (int)($params['page'] ?? 1));
+        $limit = max(1, min(100, (int)($params['limit'] ?? 20)));
+        $offset = ($page - 1) * $limit;
+        $paginated = array_slice($result, $offset, $limit);
 
         return jsonResponse($response, [
             'data' => $paginated,
-            'total' => $total,
+            'total' => (int)$total,
             'page' => $page,
-            'per_page' => $perPage
+            'limit' => $limit
         ]);
     }
 
@@ -299,6 +299,131 @@ class UserController
             ->find_many();
 
         return jsonResponse($response, ['data' => $tickets]);
+    }
+
+    public function export(Request $request, Response $response, $args)
+    {
+        $user = $request->getAttribute('user');
+        $groupFilter = $this->getUserGroupFilter($user);
+
+        $query = \ORM::for_table('users')
+            ->table_alias('u')
+            ->select('u.*')
+            ->select('g.name', 'group_name')
+            ->select('p.name', 'plan_name')
+            ->select('s.expired_at', 'expired_at')
+            ->select('s.status', 'sub_status')
+            ->left_outer_join('groups', ['u.group_id', '=', 'g.id'], 'g')
+            ->left_outer_join('subscriptions', ['u.id', '=', 's.user_id'], 's')
+            ->left_outer_join('plans', ['s.plan_id', '=', 'p.id'], 'p')
+            ->where('u.role', 'customer');
+
+        if ($groupFilter) {
+            $query = $query->where('u.group_id', $groupFilter);
+        }
+
+        $params = $request->getQueryParams();
+        if (!empty($params['status'])) {
+            $query = $query->where('u.status', $params['status']);
+        }
+        if (!empty($params['group_id'])) {
+            $query = $query->where('u.group_id', $params['group_id']);
+        }
+
+        $users = $query->order_by_desc('u.id')->find_many();
+
+        $csv = "UID,Nama,No.HP,Email,Status,Group,Paket,Alamat,Koordinat,Merk ONT,Serial ONT,Tgl Daftar\n";
+        foreach ($users as $u) {
+            $csv .= '"' . $u->uid . '",';
+            $csv .= '"' . $u->fullname . '",';
+            $csv .= '"' . $u->phone . '",';
+            $csv .= '"' . $u->email . '",';
+            $csv .= '"' . $u->status . '",';
+            $csv .= '"' . ($u->group_name ?: '') . '",';
+            $csv .= '"' . ($u->plan_name ?: '') . '",';
+            $csv .= '"' . str_replace('"', '""', $u->address ?? '') . '",';
+            $csv .= '"' . $u->coordinates . '",';
+            $csv .= '"' . $u->device_merk . '",';
+            $csv .= '"' . $u->device_serial . '",';
+            $csv .= '"' . $u->created_at . '"\n';
+        }
+
+        $response->getBody()->write($csv);
+        return $response
+            ->withHeader('Content-Type', 'text/csv; charset=utf-8')
+            ->withHeader('Content-Disposition', 'attachment; filename="customers_export_' . date('Ymd') . '.csv"')
+            ->withHeader('Cache-Control', 'no-cache');
+    }
+
+    public function toggleIsolir(Request $request, Response $response, $args)
+    {
+        $user = $request->getAttribute('user');
+        $target = \ORM::for_table('users')->find_one($args['id']);
+
+        if (!$target) {
+            return jsonResponse($response, ['error' => 'User not found'], 404);
+        }
+
+        $groupFilter = $this->getUserGroupFilter($user);
+        if ($groupFilter && $target->group_id != $groupFilter) {
+            return jsonResponse($response, ['error' => 'Forbidden'], 403);
+        }
+
+        if ($target->role !== 'customer') {
+            return jsonResponse($response, ['error' => 'Only customers can be isolated'], 400);
+        }
+
+        if ($target->status === 'isolir') {
+            // Restore from isolation
+            $target->status = 'active';
+
+            // Reactivate subscriptions and restore radius entries
+            $subs = \ORM::for_table('subscriptions')->where('user_id', $target->id)->where('status', 'expired')->find_many();
+            foreach ($subs as $sub) {
+                $plan = \ORM::for_table('plans')->find_one($sub->plan_id);
+                if (!$plan) continue;
+
+                // Create radcheck
+                $check = \ORM::for_table('radcheck')->create();
+                $check->username = $sub->username_radius;
+                $check->attribute = 'Cleartext-Password';
+                $check->op = ':=';
+                $check->value = $sub->password_radius;
+                $check->save();
+
+                // Create radreply with rate limit
+                $reply = \ORM::for_table('radreply')->create();
+                $reply->username = $sub->username_radius;
+                $reply->attribute = 'Mikrotik-Rate-Limit';
+                $reply->op = ':=';
+                $reply->value = $plan->bandwidth_download . 'k/' . $plan->bandwidth_upload . 'k';
+                $reply->save();
+
+                $sub->status = 'active';
+                $sub->save();
+            }
+        } else {
+            // Isolate
+            $target->status = 'isolir';
+
+            // Remove radius entries for all active subscriptions
+            $subs = \ORM::for_table('subscriptions')->where('user_id', $target->id)->where('status', 'active')->find_many();
+            foreach ($subs as $sub) {
+                \ORM::for_table('radcheck')->where('username', $sub->username_radius)->delete_many();
+                \ORM::for_table('radreply')->where('username', $sub->username_radius)->delete_many();
+                $sub->status = 'expired';
+                $sub->save();
+            }
+        }
+
+        $target->save();
+
+        // Log
+        $action = $target->status === 'isolir' ? 'isolir_user' : 'unisolir_user';
+        $desc = ($target->status === 'isolir' ? 'Isolated' : 'Restored from isolation') . ' user ' . $target->username;
+        $this->logAction($user->id, $action, $desc);
+
+        return jsonResponse($response, ['data' => $this->sanitize($target)]);
     }
 
     public function subscriptions(Request $request, Response $response, $args)

@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
-import { Search, FileText, Receipt, Loader2, MessageSquare } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search, FileText, Receipt, Loader2, MessageSquare, Download } from "lucide-react"
 
 interface Transaction {
-  id: number; invoice_no: string; customer_name: string; amount: number
-  status: string; due_date: string; created_at: string
+  id: number; invoice_no: string; user_name: string; amount: number
+  status: string; due_date: string; created_at: string; payment_method: string
 }
 
 function formatCurrency(val: number) {
@@ -21,13 +22,57 @@ export function TransactionList() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const [limit] = useState(20)
+  const [total, setTotal] = useState(0)
 
-  useEffect(() => {
-    api.get("/transactions")
-      .then((res) => setTransactions(Array.isArray(res.data) ? res.data : res.data?.data || []))
+  // Payment dialog state
+  const [payDialogOpen, setPayDialogOpen] = useState(false)
+  const [payingId, setPayingId] = useState<number | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState("Transfer")
+  const [paymentNote, setPaymentNote] = useState("")
+  const [paying, setPaying] = useState(false)
+
+  const fetchTransactions = () => {
+    setLoading(true)
+    api.get(`/transactions?page=${page}&limit=${limit}`)
+      .then((res) => {
+        const d = res.data
+        setTransactions(Array.isArray(d) ? d : d?.data || [])
+        setTotal(d?.total || 0)
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => {
+    fetchTransactions()
+  }, [page])
+
+  const openPayDialog = (tx: Transaction) => {
+    setPayingId(tx.id)
+    setPaymentMethod("Transfer")
+    setPaymentNote("")
+    setPayDialogOpen(true)
+  }
+
+  const handlePay = async () => {
+    if (!payingId) return
+    setPaying(true)
+    try {
+      await api.put(`/transactions/${payingId}`, {
+        status: "paid",
+        payment_method: paymentMethod,
+        payment_note: paymentNote,
+      })
+      setPayDialogOpen(false)
+      fetchTransactions()
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Gagal mencatat pembayaran")
+    } finally {
+      setPaying(false)
+    }
+  }
 
   const handleSendWa = async (id: number) => {
     try {
@@ -38,9 +83,15 @@ export function TransactionList() {
 
   const filtered = transactions.filter(
     (t) =>
-      t.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
+      (t.user_name || "")?.toLowerCase().includes(search.toLowerCase()) ||
       t.invoice_no?.toLowerCase().includes(search.toLowerCase())
   )
+
+  const totalPages = Math.max(1, Math.ceil(total / limit))
+
+  const exportQuery = new URLSearchParams()
+  const token = localStorage.getItem("token")
+  if (token) exportQuery.set("token", token)
 
   return (
     <div className="space-y-6">
@@ -49,6 +100,10 @@ export function TransactionList() {
           <h2 className="text-2xl font-bold tracking-tight">Tagihan</h2>
           <p className="text-sm text-muted-foreground">Kelola transaksi dan invoice</p>
         </div>
+        <Button variant="outline" onClick={() => window.open(`/api/transactions/export?${exportQuery.toString()}`, "_blank")}>
+          <Download className="mr-2 h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       <Card>
@@ -63,7 +118,7 @@ export function TransactionList() {
                 className="pl-9"
               />
             </div>
-            <Badge variant="secondary" className="ml-auto">{filtered.length} transaksi</Badge>
+            <Badge variant="secondary" className="ml-auto">{total} transaksi</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -87,7 +142,7 @@ export function TransactionList() {
                 filtered.map((tx) => (
                   <TableRow key={tx.id}>
                     <TableCell className="font-medium">{tx.invoice_no}</TableCell>
-                    <TableCell>{tx.customer_name}</TableCell>
+                    <TableCell>{tx.user_name}</TableCell>
                     <TableCell className="font-semibold">{formatCurrency(tx.amount)}</TableCell>
                     <TableCell>{new Date(tx.due_date).toLocaleDateString("id-ID")}</TableCell>
                     <TableCell>
@@ -97,6 +152,16 @@ export function TransactionList() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        {tx.status === "unpaid" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+                            onClick={() => openPayDialog(tx)}
+                          >
+                            Bayar
+                          </Button>
+                        )}
                         <Button variant="ghost" size="icon" className="h-8 w-8" title="Cetak Invoice">
                           <a href={`/api/transactions/${tx.id}/pdf`} target="_blank" rel="noopener noreferrer">
                             <FileText className="h-4 w-4" />
@@ -113,7 +178,64 @@ export function TransactionList() {
             </TableBody>
           </Table>
         </CardContent>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t">
+            <p className="text-sm text-muted-foreground">
+              Halaman {page} dari {totalPages} ({total} transaksi)
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                Sebelumnya
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+                Selanjutnya
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
+
+      {/* Payment Dialog */}
+      <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Catat Pembayaran</DialogTitle>
+            <DialogDescription>Konfirmasi dan catat pembayaran tagihan</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Metode Pembayaran</label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Transfer">Transfer</SelectItem>
+                  <SelectItem value="Tunai">Tunai</SelectItem>
+                  <SelectItem value="QRIS">QRIS</SelectItem>
+                  <SelectItem value="Auto-debit">Auto-debit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Keterangan</label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                value={paymentNote}
+                onChange={(e) => setPaymentNote(e.target.value)}
+                placeholder="Catatan pembayaran (opsional)"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayDialogOpen(false)}>Batal</Button>
+            <Button onClick={handlePay} disabled={paying}>
+              {paying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Konfirmasi Pembayaran
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

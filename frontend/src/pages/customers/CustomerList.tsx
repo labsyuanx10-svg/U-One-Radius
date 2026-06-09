@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Search, Eye, Edit, Trash2 } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, Download } from "lucide-react"
 
 interface Customer {
   id: number
@@ -23,28 +23,40 @@ export function CustomerList() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const [limit] = useState(20)
+  const [total, setTotal] = useState(0)
 
-  useEffect(() => {
-    api.get("/customers")
-      .then((res) => setCustomers(Array.isArray(res.data) ? res.data : res.data?.data || []))
+  const fetchCustomers = () => {
+    setLoading(true)
+    const params = `?page=${page}&limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ""}`
+    api.get(`/customers${params}`)
+      .then((res) => {
+        const d = res.data
+        setCustomers(Array.isArray(d) ? d : d?.data || [])
+        setTotal(d?.total || 0)
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }
 
-  const filtered = customers.filter(
-    (c) =>
-      c.name?.toLowerCase().includes(search.toLowerCase()) ||
-      c.uid?.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone?.includes(search)
-  )
+  useEffect(() => {
+    fetchCustomers()
+  }, [page, search])
 
   const handleDelete = async (id: number) => {
     if (!confirm("Yakin hapus pelanggan ini?")) return
     try {
       await api.delete(`/customers/${id}`)
-      setCustomers((prev) => prev.filter((c) => c.id !== id))
+      fetchCustomers()
     } catch {}
   }
+
+  const totalPages = Math.max(1, Math.ceil(total / limit))
+
+  const exportQuery = new URLSearchParams()
+  const token = localStorage.getItem("token")
+  if (token) exportQuery.set("token", token)
 
   return (
     <div className="space-y-6">
@@ -53,12 +65,18 @@ export function CustomerList() {
           <h2 className="text-2xl font-bold tracking-tight">Pelanggan</h2>
           <p className="text-sm text-muted-foreground">Kelola data pelanggan ISP</p>
         </div>
-        <Link to="/customers/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Tambah Pelanggan
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => window.open(`/api/customers/export?${exportQuery.toString()}`, "_blank")}>
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
           </Button>
-        </Link>
+          <Link to="/customers/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Tambah Pelanggan
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Card>
@@ -69,12 +87,15 @@ export function CustomerList() {
               <Input
                 placeholder="Cari nama, UID, atau no HP..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setPage(1)
+                }}
                 className="pl-9"
               />
             </div>
             <Badge variant="secondary" className="ml-auto">
-              {filtered.length} pelanggan
+              {total} pelanggan
             </Badge>
           </div>
         </CardHeader>
@@ -99,14 +120,14 @@ export function CustomerList() {
                     Memuat data...
                   </TableCell>
                 </TableRow>
-              ) : filtered.length === 0 ? (
+              ) : customers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                     Tidak ada pelanggan
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((c) => (
+                customers.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-mono text-xs font-medium">{c.uid}</TableCell>
                     <TableCell className="font-medium">{c.name}</TableCell>
@@ -150,6 +171,21 @@ export function CustomerList() {
             </TableBody>
           </Table>
         </CardContent>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t">
+            <p className="text-sm text-muted-foreground">
+              Halaman {page} dari {totalPages} ({total} pelanggan)
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                Sebelumnya
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+                Selanjutnya
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   )

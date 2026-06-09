@@ -32,9 +32,16 @@ class TicketController
             $query = $query->where('tickets.priority', $params['priority']);
         }
 
-        $tickets = $query->order_by_desc('tickets.id')->find_many();
+        // Pagination
+        $page = max(1, (int)($params['page'] ?? 1));
+        $limit = max(1, min(100, (int)($params['limit'] ?? 20)));
+        $offset = ($page - 1) * $limit;
+
+        $total = $query->count();
+
+        $tickets = $query->order_by_desc('tickets.id')->offset($offset)->limit($limit)->find_many();
         $result = array_map(function($t) { return $t->as_array(); }, $tickets);
-        return jsonResponse($response, ['data' => $result]);
+        return jsonResponse($response, ['data' => $result, 'total' => (int)$total, 'page' => $page, 'limit' => $limit]);
     }
 
     public function get(Request $request, Response $response, $args)

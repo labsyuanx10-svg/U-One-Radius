@@ -18,6 +18,7 @@ import { SettingsView } from "@/pages/settings/SettingsView"
 import { WaSettings } from "@/pages/settings/WaSettings"
 import { AdminUsers } from "@/pages/settings/AdminUsers"
 import { ActivityLog } from "@/pages/settings/ActivityLog"
+import { ProfilePage } from "@/pages/settings/ProfilePage"
 
 export const router = createBrowserRouter([
   {
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
       { path: "settings", element: <SettingsView /> },
       { path: "settings/wa", element: <WaSettings /> },
       { path: "admin-users", element: <AdminUsers /> },
+      { path: "profile", element: <ProfilePage /> },
       { path: "activity-log", element: <ActivityLog /> },
     ],
   },
