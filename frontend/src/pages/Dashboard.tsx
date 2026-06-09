@@ -115,7 +115,7 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Bento Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           title="Total Pelanggan"
           value={stats.total}
@@ -253,8 +253,11 @@ export function Dashboard() {
               <TableBody>
                 {transactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                      Belum ada transaksi
+                    <TableCell colSpan={4} className="text-center text-muted-foreground/80 py-12">
+                      <div className="flex flex-col items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-muted-foreground/50" />
+                        <span>Belum ada transaksi</span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -298,8 +301,11 @@ export function Dashboard() {
               <TableBody>
                 {tickets.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                      Belum ada tiket
+                    <TableCell colSpan={3} className="text-center text-muted-foreground/80 py-12">
+                      <div className="flex flex-col items-center gap-2">
+                        <Ticket className="h-5 w-5 text-muted-foreground/50" />
+                        <span>Belum ada tiket</span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (

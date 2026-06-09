@@ -16,7 +16,7 @@ export function Navbar({ onToggleDark, dark }: NavbarProps) {
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/80 backdrop-blur-xl px-6">
       <div>
         <h1 className="text-lg font-semibold tracking-tight">
-          Selamat datang kembali{user?.name ? `, ${user.name}` : ""}
+          Selamat datang kembali{user?.fullname ? `, ${user.fullname}` : ""}
         </h1>
         <p className="text-xs text-muted-foreground mt-0.5">
           {new Date().toLocaleDateString("id-ID", {
@@ -38,10 +38,10 @@ export function Navbar({ onToggleDark, dark }: NavbarProps) {
         </Button>
         <div className="flex items-center gap-2 ml-2 pl-2 border-l">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-semibold">
-            {user?.name?.charAt(0)?.toUpperCase() || "A"}
+            {user?.fullname?.charAt(0)?.toUpperCase() || "A"}
           </div>
           <div className="hidden sm:block text-sm">
-            <p className="font-medium leading-tight">{user?.name || "Admin"}</p>
+            <p className="font-medium leading-tight">{user?.fullname || "Admin"}</p>
             <p className="text-xs text-muted-foreground capitalize">{user?.role || "admin"}</p>
           </div>
         </div>

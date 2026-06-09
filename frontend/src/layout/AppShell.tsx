@@ -9,7 +9,7 @@ export function AppShell() {
   const { isAuthenticated, isLoading, checkAuth } = useAuthStore()
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
-  const [dark, setDark] = useState(() => localStorage.getItem("dark") === "true")
+  const [dark, setDark] = useState(() => localStorage.getItem("dark") !== "false")
 
   useEffect(() => {
     checkAuth()

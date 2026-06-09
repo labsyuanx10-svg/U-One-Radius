@@ -11,40 +11,47 @@ interface StatCardProps {
 }
 
 const colorMap = {
-  indigo: "from-indigo-500/20 to-indigo-600/10 border-indigo-200 dark:border-indigo-900",
-  green: "from-emerald-500/20 to-emerald-600/10 border-emerald-200 dark:border-emerald-900",
-  red: "from-red-500/20 to-red-600/10 border-red-200 dark:border-red-900",
-  amber: "from-amber-500/20 to-amber-600/10 border-amber-200 dark:border-amber-900",
-  sky: "from-sky-500/20 to-sky-600/10 border-sky-200 dark:border-sky-900",
+  indigo: "from-indigo-500/15 to-indigo-600/5 border-indigo-800/40",
+  green: "from-emerald-500/15 to-emerald-600/5 border-emerald-800/40",
+  red: "from-red-500/15 to-red-600/5 border-red-800/40",
+  amber: "from-amber-500/15 to-amber-600/5 border-amber-800/40",
+  sky: "from-sky-500/15 to-sky-600/5 border-sky-800/40",
 }
 
 const iconBgMap = {
-  indigo: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400",
-  green: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400",
-  red: "bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-400",
-  amber: "bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400",
-  sky: "bg-sky-100 text-sky-600 dark:bg-sky-900/50 dark:text-sky-400",
+  indigo: "bg-indigo-900/50 text-indigo-400",
+  green: "bg-emerald-900/50 text-emerald-400",
+  red: "bg-red-900/50 text-red-400",
+  amber: "bg-amber-900/50 text-amber-400",
+  sky: "bg-sky-900/50 text-sky-400",
+}
+
+const trendColorMap = {
+  up: "text-emerald-400",
+  down: "text-red-400",
 }
 
 export function StatCard({ title, value, icon, trend, trendValue, color = "indigo" }: StatCardProps) {
   return (
-    <div className={cn("bento-card relative overflow-hidden", colorMap[color])}>
+    <div className={cn("bento-card relative overflow-hidden bg-gradient-to-br", colorMap[color])}>
       <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="text-2xl font-bold mt-1">{value}</p>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-muted-foreground truncate">{title}</p>
+          <p className="text-2xl font-bold mt-1 text-white">
+            {typeof value === "number" && isNaN(value) ? "—" : value}
+          </p>
           {trend && trendValue && (
-            <div className="flex items-center gap-1 mt-2 text-xs">
+            <div className="flex items-center gap-1 mt-2 text-xs font-medium">
               {trend === "up" ? (
-                <TrendingUp className="h-3 w-3 text-emerald-500" />
+                <TrendingUp className="h-3 w-3 text-emerald-400" />
               ) : (
-                <TrendingDown className="h-3 w-3 text-red-500" />
+                <TrendingDown className="h-3 w-3 text-red-400" />
               )}
-              <span className={trend === "up" ? "text-emerald-600" : "text-red-600"}>{trendValue}</span>
+              <span className={trendColorMap[trend]}>{trendValue}</span>
             </div>
           )}
         </div>
-        <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", iconBgMap[color])}>
+        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", iconBgMap[color])}>
           {icon}
         </div>
       </div>
