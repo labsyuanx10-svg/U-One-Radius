@@ -3,11 +3,19 @@ import api from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { MessageSquare, Send, Save, Loader2, ExternalLink } from "lucide-react"
+import { MessageSquare, Send, Save, Loader2 } from "lucide-react"
+
+const providers: Record<string, { name: string; needs_session: boolean; fields: string[] }> = {
+  openwa:     { name: "OpenWA", needs_session: true, fields: ["url (full, ex: http://ip:3000)", "API Key"] },
+  fonnte:    { name: "Fonnte", needs_session: false, fields: ["(token) — disimpan di API Key", "API Key"] },
+  wablas:    { name: "Wablas", needs_session: false, fields: ["URL server Wablas", "Token"] },
+  twilio:    { name: "Twilio", needs_session: true, fields: ["Account SID", "Auth Token"] },
+  wabusiness: { name: "WA Business API", needs_session: false, fields: ["Phone Number ID", "Permanent Access Token"] },
+}
 
 export function WaSettings() {
-  const [apiUrl, setApiUrl] = useState("http://openwa-api:3000")
+  const [provider, setProvider] = useState("openwa")
+  const [apiUrl, setApiUrl] = useState("")
   const [apiKey, setApiKey] = useState("")
   const [sessionName, setSessionName] = useState("billing")
   const [testPhone, setTestPhone] = useState("")
@@ -15,29 +23,34 @@ export function WaSettings() {
   const [testResult, setTestResult] = useState("")
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     api.get("/settings")
       .then((res) => {
         const data = Array.isArray(res.data) ? res.data : res.data?.data || []
         const findVal = (key: string) => data.find((s: any) => s.key === key)?.value || ""
-        setApiUrl(findVal("wa_api_url") || "http://openwa-api:3000")
+        setProvider(findVal("wa_provider") || "openwa")
+        setApiUrl(findVal("wa_api_url") || "")
         setApiKey(findVal("wa_api_key") || "")
         setSessionName(findVal("wa_session") || "billing")
+        setLoaded(true)
       })
-      .catch(() => {})
+      .catch(() => setLoaded(true))
   }, [])
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      await api.put("/settings", {
-        settings: [
-          { key: "wa_api_url", value: apiUrl, category: "wa" },
-          { key: "wa_api_key", value: apiKey, category: "wa" },
-          { key: "wa_session", value: sessionName, category: "wa" },
-        ],
-      })
+      const settings = [
+        { key: "wa_provider", value: provider, category: "wa" },
+        { key: "wa_api_url", value: apiUrl, category: "wa" },
+        { key: "wa_api_key", value: apiKey, category: "wa" },
+      ]
+      if (providers[provider]?.needs_session) {
+        settings.push({ key: "wa_session", value: sessionName, category: "wa" })
+      }
+      await api.put("/settings", { settings })
       alert("Pengaturan WA disimpan")
     } catch { alert("Gagal menyimpan") }
     finally { setSaving(false) }
@@ -62,40 +75,73 @@ export function WaSettings() {
     finally { setTesting(false) }
   }
 
+  if (!loaded) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+
+  const prov = providers[provider] || providers.openwa
+
   return (
     <div className="space-y-6 max-w-2xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">WhatsApp Gateway</h2>
-          <p className="text-sm text-muted-foreground">Konfigurasi integrasi OpenWA</p>
-        </div>
-        <a href="http://10.10.33.52:3001" target="_blank" rel="noopener noreferrer">
-          <Button variant="outline">
-            <ExternalLink className="mr-2 h-4 w-4" />Buka Dashboard OpenWA
-          </Button>
-        </a>
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">WhatsApp Gateway</h2>
+        <p className="text-sm text-muted-foreground">Konfigurasi multi-provider WA gateway</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-primary" />
-            Konfigurasi
+            Provider & Konfigurasi
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">API URL</label>
-            <Input value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} placeholder="http://openwa-api:3000" />
+            <label className="text-sm font-medium">Pilih Provider</label>
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+              className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            >
+              {Object.entries(providers).map(([k, v]) => (
+                <option key={k} value={k}>{v.name}</option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground mt-1">
+              {provider === "openwa" && "Self-hosted OpenWA. Butuh URL server + API Key + session name."}
+              {provider === "fonnte" && "Fonnte.com. API Key = token Fonnte. Nomor HP otomatis pake 62."}
+              {provider === "wablas" && "Self-hosted Wablas. Butuh URL server + token."}
+              {provider === "twilio" && "Twilio API. API URL = Account SID, Session = From number (with country code)."}
+              {provider === "wabusiness" && "Meta WA Business API. API URL = Phone Number ID, API Key = Permanent Access Token."}
+            </p>
           </div>
+
           <div className="space-y-2">
-            <label className="text-sm font-medium">API Key</label>
-            <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key OpenWA" />
+            <label className="text-sm font-medium">API URL {prov.fields[0]}</label>
+            <Input
+              value={apiUrl}
+              onChange={(e) => setApiUrl(e.target.value)}
+              placeholder={
+                provider === "openwa" ? "http://10.10.33.52:3000" :
+                provider === "twilio" ? "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" :
+                provider === "wabusiness" ? "123456789012345" :
+                "http://your-server:port"
+              }
+            />
           </div>
+
           <div className="space-y-2">
-            <label className="text-sm font-medium">Session Name</label>
-            <Input value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="billing" />
+            <label className="text-sm font-medium">{prov.fields[1]}</label>
+            <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="***" />
           </div>
+
+          {prov.needs_session && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {provider === "twilio" ? "From Number (with country code)" : "Session Name"}
+              </label>
+              <Input value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder={provider === "twilio" ? "14155238886" : "billing"} />
+            </div>
+          )}
+
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             <Save className="mr-2 h-4 w-4" />Simpan Pengaturan

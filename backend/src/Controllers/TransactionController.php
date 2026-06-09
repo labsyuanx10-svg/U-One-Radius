@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use App\Helpers\WaAdapter;
 
 class TransactionController
 {
@@ -199,37 +200,15 @@ class TransactionController
         $message .= "Segera lakukan pembayaran sebelum jatuh tempo.\n";
         $message .= "Terima kasih.";
 
-        // Send to OpenWA
-        $payload = json_encode([
-            'session' => $waSession,
-            'to' => $cleanPhone,
-            'text' => $message
-        ]);
+        // Get provider info
+        $waProvider = \ORM::for_table('settings')->where('key', 'wa_provider')->find_one();
+        $provider = $waProvider ? $waProvider->value : 'openwa';
 
-        $apiUrl = rtrim($waUrl, '/') . '/api/sendText';
+        // Send via adapter
+        $adapter = new WaAdapter($provider, $waUrl, $waKey, $waSession);
+        $result = $adapter->sendText($cleanPhone, $message);
 
-        $ch = curl_init($apiUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $payload,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'X-API-Key: ' . $waKey
-            ],
-            CURLOPT_TIMEOUT => 15
-        ]);
-
-        $result = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($error) {
-            return jsonResponse($response, ['error' => 'Gagal terhubung ke WA Gateway: ' . $error], 500);
-        }
-
-        if ($httpCode >= 200 && $httpCode < 300) {
+        if ($result['success']) {
             // Log aktivitas
             $user = $request->getAttribute('user');
             $log = \ORM::for_table('logs')->create();
@@ -242,9 +221,7 @@ class TransactionController
             return jsonResponse($response, ['message' => 'Pesan WA berhasil dikirim']);
         }
 
-        $resp = json_decode($result, true);
-        $errMsg = $resp['message'] ?? $resp['error'] ?? 'HTTP ' . $httpCode;
-        return jsonResponse($response, ['error' => 'WA Gateway error: ' . $errMsg], 500);
+        return jsonResponse($response, ['error' => 'WA Gateway error: ' . $result['error']], 500);
     }
 
     public function pdf(Request $request, Response $response, $args)

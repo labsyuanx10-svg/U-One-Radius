@@ -154,6 +154,7 @@ $app->group('/api/tickets', function ($group) use ($authMiddleware) {
 
 // ── WhatsApp Gateway ──
 $app->post('/api/wa/test', 'App\Controllers\WaController:test')->add($authMiddleware);
+$app->get('/api/wa/providers', 'App\Controllers\WaController:providers')->add($authMiddleware);
 
 // ── RADIUS Accounting ──
 $app->group('/api/radacct', function ($group) use ($authMiddleware) {
