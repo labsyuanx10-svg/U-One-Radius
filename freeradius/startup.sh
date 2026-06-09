@@ -1,30 +1,46 @@
 #!/bin/bash
-# FreeRADIUS startup script with MySQL config patching
-
+# FreeRADIUS startup script — generate patched config via pipe
 set -e
 
-# Patch default sql.conf with our DB credentials
-sed -i \
-  -e "s|^.*server = .*|        server = \"db\"|" \
-  -e "s|^.*port = .*|        port = 3306|" \
-  -e "s|^.*login = .*|        login = \"billing\"|" \
-  -e "s|^.*password = .*|        password = \"billing\"|" \
-  -e "/ca_file\|ca_path\|certificate_file\|private_key_file/s/^/\\/* /" \
-  -e "/ca_file\|ca_path\|certificate_file\|private_key_file/s/$/ *\\//" \
-  -e "s|radius_db = \"radius\"|radius_db = \"billing\"|" \
-  /etc/freeradius/mods-available/sql
+SQL_CONF=/etc/freeradius/mods-available/sql
+SITE=/etc/freeradius/sites-enabled/default
 
-# Link sql if not already enabled
+echo "Patching SQL config..."
+
+# Generate patched version — pipe method (reliable)
+sed \
+  -e 's|^[[:space:]]*dialect = "sqlite"|        dialect = "mysql"|' \
+  -e 's|^[[:space:]]*driver = "rlm_sql_null"|        driver = "rlm_sql_mysql"|' \
+  -e 's|^#\s*server\s*=\s*"localhost"|        server = "db"|' \
+  -e 's|^#\s*port\s*=\s*3306|        port = 3306|' \
+  -e 's|^#\s*login\s*=\s*"radius"|        login = "billing"|' \
+  -e 's|^#\s*password\s*=\s*"radpass"|        password = "changeme"|' \
+  -e 's|^[[:space:]]*radius_db = "radius"|        radius_db = "billing"|' \
+  -e 's|^\s*#\s*read_clients\s*=\s*yes|        read_clients = yes|' \
+  "$SQL_CONF" > /tmp/sql-patched.conf
+
+# Comment TLS lines in mysql block (files don't exist in container)
+sed -i '/^\tmysql {/,/^\t}/{
+  /ca_file/ s/^/#/
+  /ca_path/ s/^/#/
+  /certificate_file/ s/^/#/
+  /private_key_file/ s/^/#/
+}' /tmp/sql-patched.conf
+
+# Add client_table = nas inside sql {} block
+grep -q "client_table" /tmp/sql-patched.conf || \
+  sed -i '/^sql {/a \\tclient_table = "nas"' /tmp/sql-patched.conf
+
+# Replace original
+cp /tmp/sql-patched.conf "$SQL_CONF"
+
+# Enable sql module link
 if [ ! -L /etc/freeradius/mods-enabled/sql ]; then
-  ln -s /etc/freeradius/mods-available/sql /etc/freeradius/mods-enabled/sql
+  ln -s "$SQL_CONF" /etc/freeradius/mods-enabled/sql
 fi
 
-# Set read_clients = yes in sql config
-sed -i 's/read_clients = no/read_clients = yes/' /etc/freeradius/mods-available/sql || true
-
-# Add client_table = nas inside sql {} block if not present
-grep -q "client_table" /etc/freeradius/mods-available/sql || \
-  sed -i '/^sql {/a \\tclient_table = "nas"' /etc/freeradius/mods-available/sql
+echo "Patching default site..."
+sed -i 's|#\s*-sql|-sql|g; s|#\s*-ldap|-ldap|g; s|#\s*auth_log|auth_log|g' "$SITE"
 
 echo "Starting FreeRADIUS..."
 exec /usr/sbin/freeradius -f

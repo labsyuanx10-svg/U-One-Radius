@@ -73,7 +73,6 @@ services:
     volumes:
       - ./freeradius/startup.sh:/startup.sh
       - ./freeradius/clients.conf:/etc/freeradius/clients.conf
-      - ./freeradius/default:/etc/freeradius/sites-enabled/default
     command: ["/bin/bash", "/startup.sh"]
     networks:
       - bill-net
