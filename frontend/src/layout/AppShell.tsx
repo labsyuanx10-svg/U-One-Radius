@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 import { Outlet, Navigate, useLocation } from "react-router-dom"
 import { Sidebar } from "./Sidebar"
 import { Navbar } from "./Navbar"
@@ -8,17 +8,10 @@ import { Loader2 } from "lucide-react"
 export function AppShell() {
   const { isAuthenticated, isLoading, checkAuth } = useAuthStore()
   const location = useLocation()
-  const [collapsed, setCollapsed] = useState(false)
-  const [dark, setDark] = useState(() => localStorage.getItem("dark") !== "false")
 
   useEffect(() => {
     checkAuth()
   }, [])
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark)
-    localStorage.setItem("dark", String(dark))
-  }, [dark])
 
   if (isLoading) {
     return (
@@ -33,17 +26,17 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
-      <div
-        className="flex flex-1 flex-col transition-all duration-300"
-        style={{ marginLeft: collapsed ? 64 : 240 }}
-      >
-        <Navbar onToggleDark={() => setDark(!dark)} dark={dark} />
-        <main className="flex-1 overflow-y-auto p-6">
-          <Outlet />
-        </main>
+    <div className="flex min-h-screen bg-background">
+      <div className="hidden lg:block">
+        <Sidebar />
       </div>
+
+      <main className="flex-1 p-3 md:p-4 lg:p-5 lg:ml-64">
+        <Navbar />
+        <div className="mt-4 md:mt-5">
+          <Outlet />
+        </div>
+      </main>
     </div>
   )
 }
