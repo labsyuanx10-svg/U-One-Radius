@@ -192,4 +192,23 @@ $app->group('/api/settings', function ($group) use ($authMiddleware) {
 // ── Cron ──
 $app->get('/api/cron/isolir', 'App\Controllers\CronController:isolir');
 
+// ── Infrastructure routes ──
+$app->get('/api/odc', 'App\Controllers\OdcController:list')->add($authMiddleware);
+$app->get('/api/odc/{id}', 'App\Controllers\OdcController:get')->add($authMiddleware);
+$app->post('/api/odc', 'App\Controllers\OdcController:create')->add($authMiddleware);
+$app->put('/api/odc/{id}', 'App\Controllers\OdcController:update')->add($authMiddleware);
+$app->delete('/api/odc/{id}', 'App\Controllers\OdcController:delete')->add($authMiddleware);
+
+$app->get('/api/odp', 'App\Controllers\OdpController:list')->add($authMiddleware);
+$app->get('/api/odp/{id}', 'App\Controllers\OdpController:get')->add($authMiddleware);
+$app->post('/api/odp', 'App\Controllers\OdpController:create')->add($authMiddleware);
+$app->put('/api/odp/{id}', 'App\Controllers\OdpController:update')->add($authMiddleware);
+$app->delete('/api/odp/{id}', 'App\Controllers\OdpController:delete')->add($authMiddleware);
+
+$app->get('/api/cable-routes', 'App\Controllers\CableRouteController:list')->add($authMiddleware);
+$app->get('/api/cable-routes/{id}', 'App\Controllers\CableRouteController:get')->add($authMiddleware);
+$app->post('/api/cable-routes', 'App\Controllers\CableRouteController:create')->add($authMiddleware);
+$app->put('/api/cable-routes/{id}', 'App\Controllers\CableRouteController:update')->add($authMiddleware);
+$app->delete('/api/cable-routes/{id}', 'App\Controllers\CableRouteController:delete')->add($authMiddleware);
+
 $app->run();

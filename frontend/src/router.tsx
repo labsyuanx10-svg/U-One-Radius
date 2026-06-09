@@ -19,6 +19,7 @@ import { WaSettings } from "@/pages/settings/WaSettings"
 import { AdminUsers } from "@/pages/settings/AdminUsers"
 import { ActivityLog } from "@/pages/settings/ActivityLog"
 import { ProfilePage } from "@/pages/settings/ProfilePage"
+import { Infrastructure } from "@/pages/infrastructure/Infrastructure"
 
 export const router = createBrowserRouter([
   {
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
       { path: "customers/:id/edit", element: <CustomerForm /> },
       { path: "plans", element: <PlansView /> },
       { path: "routers", element: <RouterList /> },
+      { path: "infrastructure", element: <Infrastructure /> },
       { path: "groups", element: <GroupList /> },
       { path: "tickets", element: <TicketList /> },
       { path: "tickets/new", element: <TicketForm /> },

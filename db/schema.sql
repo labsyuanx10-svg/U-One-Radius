@@ -209,6 +209,58 @@ CREATE TABLE settings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── Infrastructure (ODC, ODP, Cable Routes) ──
+CREATE TABLE odc (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(20) NOT NULL UNIQUE,
+    address TEXT,
+    latitude DECIMAL(10,7) NOT NULL DEFAULT 0,
+    longitude DECIMAL(10,7) NOT NULL DEFAULT 0,
+    capacity INT NOT NULL DEFAULT 16 COMMENT 'Total port capacity',
+    port_used INT NOT NULL DEFAULT 0 COMMENT 'Used ports',
+    router_id INT,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    notes TEXT,
+    group_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (router_id) REFERENCES routers(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE odp (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(20) NOT NULL UNIQUE,
+    address TEXT,
+    latitude DECIMAL(10,7) NOT NULL DEFAULT 0,
+    longitude DECIMAL(10,7) NOT NULL DEFAULT 0,
+    capacity INT NOT NULL DEFAULT 8 COMMENT 'Total port capacity',
+    port_used INT NOT NULL DEFAULT 0 COMMENT 'Used ports',
+    odc_id INT,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    notes TEXT,
+    group_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (odc_id) REFERENCES odc(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE cable_routes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    type ENUM('feeder','distribution','drop') NOT NULL DEFAULT 'distribution',
+    odc_id INT,
+    odp_id INT,
+    coordinates JSON NOT NULL COMMENT 'Array of [lat,lng] pairs for polyline',
+    distance_km DECIMAL(10,3) DEFAULT 0,
+    notes TEXT,
+    group_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (odc_id) REFERENCES odc(id) ON DELETE SET NULL,
+    FOREIGN KEY (odp_id) REFERENCES odp(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── RADIUS tables ──
 CREATE TABLE IF NOT EXISTS nas (
     id INT AUTO_INCREMENT PRIMARY KEY,
