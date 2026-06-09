@@ -40,10 +40,17 @@ class PoolController
 
     public function create(Request $request, Response $response, $args)
     {
+        $user = $request->getAttribute('user');
         $body = $request->getParsedBody();
 
         if (empty($body['name']) || empty($body['range_ip'])) {
             return jsonResponse($response, ['error' => 'name and range_ip required'], 400);
+        }
+
+        // Admin: auto-assign group_id
+        $groupId = $body['group_id'] ?? null;
+        if (!in_array($user->role, ['superadmin']) && $user->group_id) {
+            $groupId = $user->group_id;
         }
 
         $pool = \ORM::for_table('ip_pools')->create();
@@ -53,7 +60,7 @@ class PoolController
         $pool->dns1 = $body['dns1'] ?? '';
         $pool->dns2 = $body['dns2'] ?? '';
         $pool->router_id = $body['router_id'] ?? null;
-        $pool->group_id = $body['group_id'] ?? null;
+        $pool->group_id = $groupId;
         $pool->status = $body['status'] ?? 'active';
         $pool->save();
 

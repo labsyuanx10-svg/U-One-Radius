@@ -23,7 +23,7 @@ const navItems = [
   { label: "Pelanggan", icon: Users, to: "/customers" },
   { label: "Paket & Pool", icon: Wifi, to: "/plans" },
   { label: "Router", icon: Router, to: "/routers" },
-  { label: "Group", icon: Layers, to: "/groups" },
+  { label: "Group", icon: Layers, to: "/groups", role: "superadmin" },
   { label: "Tagihan", icon: Receipt, to: "/transactions" },
   { label: "Tiket", icon: Ticket, to: "/tickets" },
   { label: "Radius", icon: Activity, to: "/radacct" },

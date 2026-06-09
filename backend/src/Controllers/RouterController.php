@@ -40,12 +40,19 @@ class RouterController
 
     public function create(Request $request, Response $response, $args)
     {
+        $user = $request->getAttribute('user');
         $body = $request->getParsedBody();
 
         if (empty($body['name']) || empty($body['ip_address']) || empty($body['secret'])) {
             return jsonResponse($response, ['error' => 'name, ip_address, secret required'], 400);
         }
-        if (empty($body['group_id'])) {
+
+        // Admin: auto-assign group_id
+        $groupId = $body['group_id'] ?? null;
+        if (!in_array($user->role, ['superadmin']) && $user->group_id) {
+            $groupId = $user->group_id;
+        }
+        if (empty($groupId)) {
             return jsonResponse($response, ['error' => 'group_id required'], 400);
         }
 
@@ -54,7 +61,7 @@ class RouterController
         $router->ip_address = $body['ip_address'];
         $router->secret = $body['secret'];
         $router->type = $body['type'] ?? 'pppoe';
-        $router->group_id = $body['group_id'];
+        $router->group_id = $groupId;
         $router->description = $body['description'] ?? '';
         $router->status = $body['status'] ?? 'active';
         $router->save();

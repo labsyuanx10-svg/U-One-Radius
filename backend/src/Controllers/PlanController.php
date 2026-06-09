@@ -41,10 +41,17 @@ class PlanController
 
     public function create(Request $request, Response $response, $args)
     {
+        $user = $request->getAttribute('user');
         $body = $request->getParsedBody();
 
         if (empty($body['name'])) {
             return jsonResponse($response, ['error' => 'name required'], 400);
+        }
+
+        // Admin: auto-assign group_id
+        $groupId = $body['group_id'] ?? null;
+        if (!in_array($user->role, ['superadmin']) && $user->group_id) {
+            $groupId = $user->group_id;
         }
 
         $plan = \ORM::for_table('plans')->create();
@@ -59,7 +66,7 @@ class PlanController
         $plan->ip_pool_id = $body['ip_pool_id'] ?? null;
         $plan->shared_users = $body['shared_users'] ?? 1;
         $plan->description = $body['description'] ?? '';
-        $plan->group_id = $body['group_id'] ?? null;
+        $plan->group_id = $groupId;
         $plan->status = $body['status'] ?? 'active';
         $plan->save();
 
