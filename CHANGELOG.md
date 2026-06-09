@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2.1-dev (2026-06-09)
+## v0.2.2-dev (2026-06-09)
 
 ### Fixed
 - **FreeRADIUS startup** — rewrite sed ke pipe method biar gak double-patch pas re-run container
