@@ -1,0 +1,104 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(222 47% 11%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222 47% 11%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222 47% 11%);
+  --primary: hsl(246 80% 60%);
+  --primary-foreground: hsl(210 40% 98%);
+  --secondary: hsl(210 40% 96%);
+  --secondary-foreground: hsl(222 47% 11%);
+  --muted: hsl(210 40% 96%);
+  --muted-foreground: hsl(215 16% 47%);
+  --accent: hsl(246 80% 96%);
+  --accent-foreground: hsl(222 47% 11%);
+  --destructive: hsl(0 84% 60%);
+  --destructive-foreground: hsl(210 40% 98%);
+  --border: hsl(214 32% 91%);
+  --input: hsl(214 32% 91%);
+  --ring: hsl(246 80% 60%);
+  --radius: 0.75rem;
+  --sidebar: hsl(226 40% 10%);
+  --sidebar-foreground: hsl(226 20% 70%);
+  --sidebar-accent: hsl(226 30% 18%);
+  --sidebar-ring: hsl(246 60% 50%);
+}
+
+.dark {
+  --background: hsl(222 47% 4%);
+  --foreground: hsl(210 40% 98%);
+  --card: hsl(222 47% 7%);
+  --card-foreground: hsl(210 40% 98%);
+  --popover: hsl(222 47% 7%);
+  --popover-foreground: hsl(210 40% 98%);
+  --primary: hsl(246 70% 55%);
+  --primary-foreground: hsl(210 40% 98%);
+  --secondary: hsl(217 32% 17%);
+  --secondary-foreground: hsl(210 40% 98%);
+  --muted: hsl(217 32% 17%);
+  --muted-foreground: hsl(215 20% 65%);
+  --accent: hsl(246 50% 15%);
+  --accent-foreground: hsl(210 40% 98%);
+  --destructive: hsl(0 62% 30%);
+  --destructive-foreground: hsl(210 40% 98%);
+  --border: hsl(217 32% 17%);
+  --input: hsl(217 32% 17%);
+  --ring: hsl(246 70% 55%);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Bento grid */
+.bento-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.bento-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.bento-card:hover {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  border-color: var(--ring);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.4);
+}

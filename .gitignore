@@ -8,3 +8,4 @@ dist/
 # OpenWA submodule — managed separately
 openwa/
 !openwa/.gitkeep
+frontend/tsconfig.app.tsbuildinfo
