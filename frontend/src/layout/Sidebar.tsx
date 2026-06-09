@@ -32,7 +32,7 @@ const navItems = [
   { label: "Radius", icon: Activity, to: "/radacct" },
   { label: "WA Gateway", icon: MessageSquare, to: "/settings/wa" },
   { label: "Admin Users", icon: Shield, to: "/admin-users", role: "superadmin" },
-  { label: "Activity Log", icon: ScrollText, to: "/activity-log", role: "superadmin" },
+  { label: "Logs", icon: ScrollText, to: "/logs" },
   { label: "Settings", icon: Settings, to: "/settings", role: "superadmin" },
 ]
 

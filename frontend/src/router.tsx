@@ -17,7 +17,7 @@ import { LogRadius } from "@/pages/radacct/LogRadius"
 import { SettingsView } from "@/pages/settings/SettingsView"
 import { WaSettings } from "@/pages/settings/WaSettings"
 import { AdminUsers } from "@/pages/settings/AdminUsers"
-import { ActivityLog } from "@/pages/settings/ActivityLog"
+import { LogsPage } from "@/pages/logs/LogsPage"
 import { ProfilePage } from "@/pages/settings/ProfilePage"
 import { Infrastructure } from "@/pages/infrastructure/Infrastructure"
 
@@ -49,7 +49,7 @@ export const router = createBrowserRouter([
       { path: "settings/wa", element: <WaSettings /> },
       { path: "admin-users", element: <AdminUsers /> },
       { path: "profile", element: <ProfilePage /> },
-      { path: "activity-log", element: <ActivityLog /> },
+      { path: "logs", element: <LogsPage /> },
     ],
   },
   {
