@@ -152,6 +152,15 @@ $app->group('/api/tickets', function ($group) use ($authMiddleware) {
     $group->delete('/{id}', 'App\Controllers\TicketController:delete');
 })->add($authMiddleware);
 
+// ── Admin Users (superadmin only) ──
+$app->group('/api/admin-users', function ($group) use ($authMiddleware, $adminMiddleware) {
+    $group->get('', 'App\Controllers\AdminUserController:list');
+    $group->get('/{id}', 'App\Controllers\AdminUserController:get');
+    $group->post('', 'App\Controllers\AdminUserController:create');
+    $group->put('/{id}', 'App\Controllers\AdminUserController:update');
+    $group->delete('/{id}', 'App\Controllers\AdminUserController:delete');
+})->add($adminMiddleware)->add($authMiddleware);
+
 // ── WhatsApp Gateway ──
 $app->post('/api/wa/test', 'App\Controllers\WaController:test')->add($authMiddleware);
 $app->get('/api/wa/providers', 'App\Controllers\WaController:providers')->add($authMiddleware);

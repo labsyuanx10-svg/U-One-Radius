@@ -16,6 +16,7 @@ import { StatusOnline } from "@/pages/radacct/StatusOnline"
 import { LogRadius } from "@/pages/radacct/LogRadius"
 import { SettingsView } from "@/pages/settings/SettingsView"
 import { WaSettings } from "@/pages/settings/WaSettings"
+import { AdminUsers } from "@/pages/settings/AdminUsers"
 
 export const router = createBrowserRouter([
   {
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
       { path: "radacct/logradius", element: <LogRadius /> },
       { path: "settings", element: <SettingsView /> },
       { path: "settings/wa", element: <WaSettings /> },
+      { path: "admin-users", element: <AdminUsers /> },
     ],
   },
   {

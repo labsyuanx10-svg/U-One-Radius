@@ -13,6 +13,7 @@ import {
   MessageSquare,
   LogOut,
   ChevronLeft,
+  Shield,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuthStore } from "@/stores/authStore"
@@ -27,6 +28,7 @@ const navItems = [
   { label: "Tiket", icon: Ticket, to: "/tickets" },
   { label: "Radius", icon: Activity, to: "/radacct" },
   { label: "WA Gateway", icon: MessageSquare, to: "/settings/wa" },
+  { label: "Admin Users", icon: Shield, to: "/admin-users", role: "superadmin" },
   { label: "Settings", icon: Settings, to: "/settings" },
 ]
 
@@ -38,6 +40,11 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation()
   const logout = useAuthStore((s) => s.logout)
+  const currentUser = useAuthStore((s) => s.user)
+
+  const visibleItems = navItems.filter(
+    (item) => !item.role || (currentUser && currentUser.role === item.role)
+  )
 
   return (
     <aside
@@ -72,7 +79,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive =
             item.to === "/"
               ? location.pathname === "/"
