@@ -4,7 +4,7 @@ Billing ISP Management System — PHP + Vue 3 + Docker + FreeRADIUS
 
 **Tech:** PHP 8.4 (Slim Framework) · Vue 3 · PrimeVue 4 · MariaDB 11 · FreeRADIUS · Docker
 
-Status: **v0.2.0-dev** (masih pengembangan)
+Status: **v0.2.1-dev** (masih pengembangan)
 
 ## Fitur
 

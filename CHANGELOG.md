@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.1-dev (2026-06-09)
+
+### Fixed
+- **FreeRADIUS startup** — rewrite sed ke pipe method biar gak double-patch pas re-run container
+- **TLS config** — comment ca_file/ca_path/certificate_file/private_key_file (gak ada di container)
+- **SQL module** — set `dialect = mysql`, `driver = rlm_sql_mysql`, `read_clients = yes`
+- **Default site** — enable sql & auth_log di `sites-enabled/default`
+- **Docker network client** — tambah `docker-net` (192.168.176.0/24) di clients.conf
+- **docker-compose.yml** — hapus bind volume `site-enabled/default` yg stale (mencegah bentrok)
+
+---
+
 ## v0.2.0-dev (2026-06-05)
 
 ### Added

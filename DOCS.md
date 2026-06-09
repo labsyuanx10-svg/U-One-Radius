@@ -88,7 +88,8 @@ billing/
 │           │   └── LogRadius.vue
 │           └── settings/SettingsView.vue
 ├── freeradius/
-│   └── startup.sh              # Config patch untuk FreeRADIUS
+│   ├── startup.sh              # Config patch untuk FreeRADIUS
+│   └── clients.conf            # RADIUS client definitions (local + docker-net)
 ├── scripts/
 │   └── setup-routers.php       # Sync RADIUS NAS table
 └── memory/                     # Catatan sesi
@@ -417,7 +418,7 @@ server {
 | `db` | mariadb:11 | 3306 | - | `bill-db-data` (volume) |
 | `backend` | custom (php:8.4-apache) | 8090:80 | db (healthy) | - |
 | `frontend` | custom (nginx) | 8091:80 | - | - |
-| `freeradius` | freeradius/freeradius-server | 1812-1813/udp | db (healthy) | - |
+| `freeradius` | freeradius/freeradius-server | 1812-1813/udp | db (healthy) | `freeradius/clients.conf` map ke default conf |
 | `openwa-api` | custom (node:22 + puppeteer) | 3000:2785 | - | `./openwa/data:/app/data` |
 | `openwa-dashboard` | custom (nginx:alpine) | 3001:80 | openwa-api | - |
 
