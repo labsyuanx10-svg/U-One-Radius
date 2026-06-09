@@ -152,6 +152,9 @@ $app->group('/api/tickets', function ($group) use ($authMiddleware) {
     $group->delete('/{id}', 'App\Controllers\TicketController:delete');
 })->add($authMiddleware);
 
+// ── Activity Log ──
+$app->get('/api/logs', 'App\Controllers\LogController:list')->add($authMiddleware);
+
 // ── Admin Users (superadmin only) ──
 $app->group('/api/admin-users', function ($group) use ($authMiddleware, $adminMiddleware) {
     $group->get('', 'App\Controllers\AdminUserController:list');

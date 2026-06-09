@@ -12,7 +12,7 @@ class AdminMiddleware
     {
         $user = $request->getAttribute('user');
 
-        if (!$user || !in_array($user->role, ['superadmin', 'admin'])) {
+        if (!$user || !in_array($user->role, ['superadmin', 'admin', 'teknisi'])) {
             $response = new Response();
             $response->getBody()->write(json_encode(['error' => 'Forbidden: admin only']));
             return $response

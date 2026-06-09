@@ -57,8 +57,8 @@ class TicketController
         $user = $request->getAttribute('user');
         $body = $request->getParsedBody();
 
-        if (empty($body['user_id']) || empty($body['description'])) {
-            return jsonResponse($response, ['error' => 'user_id and description required'], 400);
+        if (empty($body['description'])) {
+            return jsonResponse($response, ['error' => 'description required'], 400);
         }
 
         // Generate ticket_no
@@ -66,14 +66,23 @@ class TicketController
 
         $ticket = \ORM::for_table('tickets')->create();
         $ticket->ticket_no = $ticketNo;
-        $ticket->user_id = $body['user_id'];
+        $ticket->user_id = $body['user_id'] ?? 0;
         $ticket->category = $body['category'] ?? 'jaringan';
         $ticket->priority = $body['priority'] ?? 'sedang';
         $ticket->status = 'baru';
         $ticket->description = $body['description'];
+        $ticket->subject = $body['subject'] ?? substr($body['description'], 0, 100);
         $ticket->assigned_to = $body['assigned_to'] ?? null;
         $ticket->created_by = $user->id;
         $ticket->save();
+
+        // Log
+        $log = \ORM::for_table('logs')->create();
+        $log->user_id = $user->id;
+        $log->action = 'ticket_create';
+        $log->description = "Buat tiket {$ticketNo}: {$ticket->subject}";
+        $log->ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
+        $log->save();
 
         return jsonResponse($response, ['data' => $ticket], 201);
     }
@@ -81,25 +90,47 @@ class TicketController
     public function update(Request $request, Response $response, $args)
     {
         $user = $request->getAttribute('user');
-        $ticket = \ORM::for_table('tickets')->find_one($args['id']);
+
+        $ticket = \ORM::for_table('tickets')
+            ->select('tickets.*')
+            ->select('users.group_id', 'customer_group_id')
+            ->join('users', ['tickets.user_id', '=', 'users.id'])
+            ->where('tickets.id', $args['id'])
+            ->find_one();
 
         if (!$ticket) {
             return jsonResponse($response, ['error' => 'Ticket not found'], 404);
         }
 
-        $body = $request->getParsedBody();
-
-        if (isset($body['status'])) {
-            $ticket->status = $body['status'];
-            if ($body['status'] === 'selesai' || $body['status'] === 'ditolak') {
-                $ticket->closed_at = date('Y-m-d H:i:s');
+        // Group check for non-superadmin
+        if (!in_array($user->role, ['superadmin'])) {
+            if ($user->group_id != $ticket->customer_group_id) {
+                return jsonResponse($response, ['error' => 'Forbidden: not your group'], 403);
             }
         }
-        if (isset($body['solution'])) $ticket->solution = $body['solution'];
-        if (isset($body['category'])) $ticket->category = $body['category'];
-        if (isset($body['priority'])) $ticket->priority = $body['priority'];
-        if (isset($body['assigned_to'])) $ticket->assigned_to = $body['assigned_to'];
-        if (isset($body['description'])) $ticket->description = $body['description'];
+
+        $body = $request->getParsedBody();
+
+        // Teknisi: only status, solution, assigned_to
+        if (in_array($user->role, ['teknisi'])) {
+            if (isset($body['status'])) $ticket->status = $body['status'];
+            if (isset($body['solution'])) $ticket->solution = $body['solution'];
+            if (isset($body['assigned_to'])) $ticket->assigned_to = $body['assigned_to'];
+        } else {
+            // Admin & Superadmin: full
+            if (isset($body['status'])) $ticket->status = $body['status'];
+            if (isset($body['solution'])) $ticket->solution = $body['solution'];
+            if (isset($body['category'])) $ticket->category = $body['category'];
+            if (isset($body['priority'])) $ticket->priority = $body['priority'];
+            if (isset($body['assigned_to'])) $ticket->assigned_to = $body['assigned_to'];
+            if (isset($body['description'])) $ticket->description = $body['description'];
+        }
+
+        if (in_array($ticket->status, ['selesai', 'ditolak'])) {
+            $ticket->closed_at = date('Y-m-d H:i:s');
+            $ticket->closed_by = $user->id;
+        }
+
         $ticket->save();
 
         return jsonResponse($response, ['data' => $ticket]);
@@ -107,6 +138,11 @@ class TicketController
 
     public function delete(Request $request, Response $response, $args)
     {
+        $user = $request->getAttribute('user');
+        if (!in_array($user->role, ['superadmin'])) {
+            return jsonResponse($response, ['error' => 'Forbidden'], 403);
+        }
+
         $ticket = \ORM::for_table('tickets')->find_one($args['id']);
         if (!$ticket) {
             return jsonResponse($response, ['error' => 'Ticket not found'], 404);

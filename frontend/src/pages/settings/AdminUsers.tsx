@@ -204,6 +204,7 @@ export function AdminUsers() {
                 <select value={form.role} onChange={(e) => setForm(p => ({ ...p, role: e.target.value }))} className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
                   <option value="superadmin">Super Admin</option>
                   <option value="admin">Admin</option>
+                  <option value="teknisi">Teknisi</option>
                   <option value="auditor">Auditor</option>
                 </select>
               </div>
